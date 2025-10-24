@@ -7,12 +7,12 @@ class Util:
     def __init__(self, window):
         self._window = window
     
-    def label(self):
+    def label(self) -> Label:
         return Label(self._window,
                      bg=PROGRAM_BG_COLOR,
                      fg=BUTTON_BG_COLOR)
     
-    def button(self):
+    def button(self) -> Button:
         return Button(self._window,
                       bg=BUTTON_BG_COLOR,
                       relief=FLAT,
@@ -21,10 +21,10 @@ class Util:
                       cursor="hand2",
                       font=("Arial", 24, "normal"))
         
-    def frame(self):
+    def frame(self) -> Frame:
         return Frame(self._window,
                      bg=PROGRAM_BG_COLOR)
         
-    def text(self):
+    def text(self) -> Text:
         return Text(self._window,
                     fg=BUTTON_BG_COLOR)

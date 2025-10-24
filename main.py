@@ -43,7 +43,7 @@ class Window:
     def run(self):
         self._window.mainloop()
 
-def menu():
+def menu() -> None:
     """
     Main (menu) window of program.
     """
@@ -84,7 +84,7 @@ def menu():
     new_note_btn.pack(side=BOTTOM,
                       pady=(0, 25))
 
-def new_note():
+def new_note() -> None:
     """
     Window to input new notes.
     """
@@ -119,6 +119,27 @@ def new_note():
                      height=40)
     note_text.pack()
     
+        # add placeholder
+    placeholder_text = "This is where you'll enter your notes.\n\n" \
+        "You can also upload files containing text to which it will appear here.\n\n" \
+        "When you're finished, click 'Generate' to create a multiple-choice exam pertaining your notes.\n\n" \
+        "Don't worry, all of your changes will be automatically saved."
+    note_text.insert("1.0", placeholder_text)
+    note_text.config(fg="gray")
+
+    def clear_placeholder(event):
+        if note_text.get("1.0", "end-1c") == placeholder_text:
+            note_text.delete("1.0", "end")
+            note_text.config(fg="white")
+
+    def add_placeholder_if_empty(event):
+        if not note_text.get("1.0", "end-1c").strip():
+            note_text.insert("1.0", placeholder_text)
+            note_text.config(fg="gray")
+
+    note_text.bind("<FocusIn>", clear_placeholder)
+    note_text.bind("<FocusOut>", add_placeholder_if_empty)
+    
     # note option frame
     note_option_frame = Util(new_note_window).frame()
     note_option_frame.pack(side=BOTTOM)
@@ -150,6 +171,12 @@ def new_note():
     generate_exam_btn.image = generate_exam_icon
     generate_exam_btn.pack(side=RIGHT,
                            padx=(0, 10))
+    
+def upload_file() -> None:
+    """
+    Uploads files into the text area.
+    """
+    pass
     
 if __name__ == "__main__":
     main_window = Window()
