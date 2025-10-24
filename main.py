@@ -1,6 +1,8 @@
 from tkinter import *
+from tkinter import filedialog, messagebox
 from PIL import ImageTk
 import PIL.Image as PImage
+import os
 
 from util import *
 
@@ -151,10 +153,156 @@ def new_note() -> None:
         # upload button
     upload_btn = Util(new_note_window).button()
     upload_btn.config(image=upload_icon,
-                      command=lambda: print("upload"))
+                      command=lambda: upload_file_window())
     upload_btn.image = upload_icon  # keeps reference
     upload_btn.pack(side=LEFT,
                     padx=(10, 0))
+    
+    def upload_file_window() -> None:
+        """
+        Uploads files into the text area.
+        """
+        # creates a new window
+        upload_file_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Upload Note",
+                                                         "500x250")
+        
+        # upload option frame
+        upload_options_frame = Util(upload_file_window).frame()
+        upload_options_frame.pack(side=TOP,
+                                  pady=(25, 0))
+        
+            # load and resize image
+        pil_image = PImage.open("./assets/upload_icon.png")
+        pil_image = pil_image.resize((64, 64))  # reize
+        upload_icon = ImageTk.PhotoImage(pil_image)
+            # upload image
+        upload_label = Util(upload_options_frame).label()
+        upload_label.config(image=upload_icon)
+        upload_btn.image = upload_icon  # keeps reference
+        upload_label.pack()
+        
+            # upload instruction label
+        upload_instruction_label = Util(upload_options_frame).label()
+        upload_instruction_label.config(text="Choose a file or drag & drop here",
+                                        font=("Arial", 20, "normal"))
+        upload_instruction_label.pack()
+            
+            # upload sub-instruction label
+        upload_sub_instruction_label = Util(upload_options_frame).label()
+        upload_sub_instruction_label.config(text="JPG, PNG, TXT, and DOCX formats, up to 50 MB",
+                                            font=("Arial", 12, "normal"),
+                                            fg="#D9D9D9")
+        upload_sub_instruction_label.pack()
+        
+            # browse files button
+        browse_file_btn = Util(upload_options_frame).button()
+        browse_file_btn.config(text="Browse File",
+                               font=("Arial", 12, "normal"),
+                               padx=10,
+                               command=lambda: upload_file())
+        browse_file_btn.pack(pady=(10, 0))
+        
+        def upload_file() -> None:
+            # supported file types
+            file_types = [
+                ("Text files", "*.txt"),
+                ("JPG files", "*.jpg"),
+                ("PNG files", "*.png"),
+                ("DOCX files", "*.docx")
+            ]
+            
+            # open file dialog
+            file_path = filedialog.askopenfilename(
+                title="Select a file to upload",
+                filetypes=file_types
+            )
+            
+            # if user selected a file
+            if file_path:
+                try:
+                    # get file size to check if it's too large
+                    file_size = os.path.getsize(file_path)
+                    max_size = 5 * 1024 * 1024  # 5MB limit
+                    
+                    if file_size > max_size:
+                        messagebox.showwarning(
+                            "File Too Large",
+                            f"The selected file is too large ({file_size // 1024} KB).\n"
+                            f"Please select a file smaller than 5MB."
+                        )
+                        return
+                    
+                    # read the file content
+                    with open(file_path, 'r', encoding='utf-8') as file:
+                        content = file.read()
+                    
+                    # clear any existing placeholder
+                    current_content = note_text.get("1.0", "end-1c")
+                    if current_content == placeholder_text:
+                        note_text.delete("1.0", "end")
+                        note_text.config(fg="white")
+                    
+                    # insert file content at cursor position or replace all
+                    if note_text.get("1.0", "end-1c").strip():  # if there's existing content
+                        # ask user if they want to replace or append
+                        choice = messagebox.askyesnocancel(
+                            "Insert Content",
+                            "Would you like to replace the current content?\n\n"
+                            "Yes - Replace all content\n"
+                            "No - Append to current content\n"
+                            "Cancel - Do nothing"
+                        )
+                        
+                        if choice is None:  # cancel
+                            return
+                        elif choice:  # yes - replace all
+                            note_text.delete("1.0", "end")
+                            note_text.insert("1.0", content)
+                        else:  # no - append
+                            note_text.insert("end", f"\n\n--- Content from {os.path.basename(file_path)} ---\n")
+                            note_text.insert("end", content)
+                    else:
+                        # just insert if text area is empty
+                        note_text.insert("1.0", content)
+                    
+                    # show success message
+                    messagebox.showinfo(
+                        "File Uploaded",
+                        f"Successfully loaded: {os.path.basename(file_path)}"
+                    )
+                    
+                except UnicodeDecodeError:
+                    # try with different encoding if UTF-8 fails
+                    try:
+                        with open(file_path, 'r', encoding='latin-1') as file:
+                            content = file.read()
+                        
+                        # insert content (similar to above)
+                        current_content = note_text.get("1.0", "end-1c")
+                        if current_content == placeholder_text:
+                            note_text.delete("1.0", "end")
+                            note_text.config(fg="white")
+                        
+                        note_text.insert("end", f"\n\n--- Content from {os.path.basename(file_path)} ---\n")
+                        note_text.insert("end", content)
+                        
+                        messagebox.showinfo(
+                            "File Uploaded",
+                            f"Successfully loaded: {os.path.basename(file_path)}\n"
+                            f"(Note: Used fallback encoding)"
+                        )
+                        
+                    except Exception as e:
+                        messagebox.showerror(
+                            "Error Reading File",
+                            f"Could not read the file: {str(e)}"
+                        )
+                
+                except Exception as e:
+                    messagebox.showerror(
+                        "Error",
+                        f"An error occurred while reading the file: {str(e)}"
+                    )
     
         # load and resize image
     pil_image = PImage.open("./assets/generate_exam_icon.png")
@@ -171,12 +319,6 @@ def new_note() -> None:
     generate_exam_btn.image = generate_exam_icon
     generate_exam_btn.pack(side=RIGHT,
                            padx=(0, 10))
-    
-def upload_file() -> None:
-    """
-    Uploads files into the text area.
-    """
-    pass
     
 if __name__ == "__main__":
     main_window = Window()
