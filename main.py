@@ -2,12 +2,17 @@ from tkinter import *
 from tkinter import filedialog, messagebox
 from PIL import ImageTk
 import PIL.Image as PImage
+import json
 import os
+from datetime import datetime
 
 from util import *
+from note import NoteManager
 
 PROGRAM_TITLE = "ExamAI"
 DEFAULT_GEOMETRY = "750x850"
+
+note_manager = NoteManager()
 
 class Window:
     def __init__(self, is_main=True):
@@ -92,6 +97,9 @@ def new_note() -> None:
     """
     # creates a new window
     new_note_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - New Note")
+    
+    # generate unique ID for this note session
+    note_id = f"note_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     # note information frame
     note_frame = Util(new_note_window).frame()
@@ -320,6 +328,31 @@ def new_note() -> None:
     generate_exam_btn.pack(side=RIGHT,
                            padx=(0, 10))
     
+    # auto-save function using NoteManager
+    def auto_save():
+        title = title_text.get("1.0", "end-1c").strip() or "Untitled"
+        content = note_text.get("1.0", "end-1c")
+        
+        if note_manager.save_note(note_id, title, content, placeholder_text):
+            current_time = datetime.now().strftime("%H:%M:%S")
+            note_status_label.config(text=f"Auto-saved at {current_time}")
+        
+        new_note_window.after(30000, auto_save)  # every 30 seconds
+    
+    # start auto-save
+    auto_save()
+    
+    # save on close
+    def on_closing():
+        title = title_text.get("1.0", "end-1c").strip() or "Untitled"
+        content = note_text.get("1.0", "end-1c")
+        note_manager.save_note(note_id, title, content, placeholder_text)
+        new_note_window.destroy()
+    
+    new_note_window.protocol("WM_DELETE_WINDOW", on_closing)
+
+
+
 if __name__ == "__main__":
     main_window = Window()
     menu()
