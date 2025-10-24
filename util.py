@@ -24,3 +24,7 @@ class Util:
     def frame(self):
         return Frame(self._window,
                      bg=PROGRAM_BG_COLOR)
+        
+    def text(self):
+        return Text(self._window,
+                    fg=BUTTON_BG_COLOR)
