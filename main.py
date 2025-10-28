@@ -74,7 +74,7 @@ def menu() -> None:
         # view notes button
     view_notes_btn = Util(view_framework).button()
     view_notes_btn.config(text="View Notes",
-                          command=lambda: print("view notes"))
+                          command=lambda: view_notes())
     view_notes_btn.pack(side=LEFT)
     
         # view exams button
@@ -91,15 +91,33 @@ def menu() -> None:
     new_note_btn.pack(side=BOTTOM,
                       pady=(0, 25))
 
-def new_note() -> None:
+def new_note(note_id=None) -> None:
     """
     Window to input new notes.
     """
     # creates a new window
     new_note_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - New Note")
     
-    # generate unique ID for this note session
-    note_id = f"note_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    # load notes data
+    notes_data = {}
+    try:
+        with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+            notes_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    
+    # initialize variables
+    title_content = "Untitled"
+    note_content = ""
+    
+    # if note_id is provided and exists, load the data
+    if note_id and note_id in notes_data:
+        note_data = notes_data[note_id]
+        title_content = note_data.get("title", "Untitled")
+        note_content = note_data.get("content", "")
+    else:
+        # generate unique ID for new note session
+        note_id = f"note_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     # note information frame
     note_frame = Util(new_note_window).frame()
@@ -111,7 +129,7 @@ def new_note() -> None:
                       font=("Arial", 20, "normal"),
                       width=30,
                       height=1)
-    title_text.insert(INSERT, "Untitled")
+    title_text.insert(INSERT, title_content)
     title_text.pack(side=LEFT,
                     padx=(0, 135))
     
@@ -129,26 +147,30 @@ def new_note() -> None:
                      height=40)
     note_text.pack()
     
+    if note_content.strip():  # If there's existing content
+        note_text.insert(INSERT, note_content)
+        note_text.config(fg="white")
+    else:
         # add placeholder
-    placeholder_text = "This is where you'll enter your notes.\n\n" \
-        "You can also upload files containing text to which it will appear here.\n\n" \
-        "When you're finished, click 'Generate' to create a multiple-choice exam pertaining your notes.\n\n" \
-        "Don't worry, all of your changes will be automatically saved."
-    note_text.insert("1.0", placeholder_text)
-    note_text.config(fg="gray")
+        placeholder_text = "This is where you'll enter your notes.\n\n" \
+            "You can also upload files containing text to which it will appear here.\n\n" \
+            "When you're finished, click 'Generate' to create a multiple-choice exam pertaining your notes.\n\n" \
+            "Don't worry, all of your changes will be automatically saved."
+        note_text.insert("1.0", placeholder_text)
+        note_text.config(fg="gray")
 
-    def clear_placeholder(event):
-        if note_text.get("1.0", "end-1c") == placeholder_text:
-            note_text.delete("1.0", "end")
-            note_text.config(fg="white")
+        def clear_placeholder(event):
+            if note_text.get("1.0", "end-1c") == placeholder_text:
+                note_text.delete("1.0", "end")
+                note_text.config(fg="white")
 
-    def add_placeholder_if_empty(event):
-        if not note_text.get("1.0", "end-1c").strip():
-            note_text.insert("1.0", placeholder_text)
-            note_text.config(fg="gray")
+        def add_placeholder_if_empty(event):
+            if not note_text.get("1.0", "end-1c").strip():
+                note_text.insert("1.0", placeholder_text)
+                note_text.config(fg="gray")
 
-    note_text.bind("<FocusIn>", clear_placeholder)
-    note_text.bind("<FocusOut>", add_placeholder_if_empty)
+        note_text.bind("<FocusIn>", clear_placeholder)
+        note_text.bind("<FocusOut>", add_placeholder_if_empty)
     
     # note option frame
     note_option_frame = Util(new_note_window).frame()
@@ -156,7 +178,7 @@ def new_note() -> None:
 
         # load and resize image
     pil_image = PImage.open("./assets/upload_icon.png")
-    pil_image = pil_image.resize((64, 64))  # reize
+    pil_image = pil_image.resize((64, 64))  # resize
     upload_icon = ImageTk.PhotoImage(pil_image)
         # upload button
     upload_btn = Util(new_note_window).button()
@@ -181,12 +203,12 @@ def new_note() -> None:
         
             # load and resize image
         pil_image = PImage.open("./assets/upload_icon.png")
-        pil_image = pil_image.resize((64, 64))  # reize
+        pil_image = pil_image.resize((64, 64))  # resize
         upload_icon = ImageTk.PhotoImage(pil_image)
             # upload image
         upload_label = Util(upload_options_frame).label()
         upload_label.config(image=upload_icon)
-        upload_btn.image = upload_icon  # keeps reference
+        upload_label.image = upload_icon  # keeps reference
         upload_label.pack()
         
             # upload instruction label
@@ -314,7 +336,7 @@ def new_note() -> None:
     
         # load and resize image
     pil_image = PImage.open("./assets/generate_exam_icon.png")
-    pil_image = pil_image.resize((64, 64))  # reize
+    pil_image = pil_image.resize((64, 64))  # resize
     generate_exam_icon = ImageTk.PhotoImage(pil_image)
         # generate button
     generate_exam_btn = Util(new_note_window).button()
@@ -351,7 +373,194 @@ def new_note() -> None:
     
     new_note_window.protocol("WM_DELETE_WINDOW", on_closing)
 
+def view_notes() -> None:
+    view_notes_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - View Notes")
+    
+    # search notes frame
+    search_notes_frame = Util(view_notes_window).frame()
+    search_notes_frame.pack(side=TOP,
+                            pady=(0, 5))
+    
+        # load and resize image
+    pil_image = PImage.open("./assets/search_icon.png")
+    pil_image = pil_image.resize((32, 32))  # resize
+    search_icon = ImageTk.PhotoImage(pil_image)
+        # upload image
+    search_label = Util(search_notes_frame).label()
+    search_label.config(image=search_icon)
+    search_label.image = search_icon  # keeps reference
+    search_label.pack(side=LEFT)
+    
+        # search notes text
+    search_notes_text = Util(search_notes_frame).text()
+    search_notes_text.config(font=("Arial", 16, "normal"),
+                             bg="#4D4C4C",
+                             height=1)
+    search_notes_text.pack(side=LEFT)
+    
+        # add placeholder
+    placeholder_text = "Search..."
+    search_notes_text.insert("1.0", placeholder_text)
+    search_notes_text.config(fg="gray")
 
+    def clear_placeholder(event):
+        if search_notes_text.get("1.0", "end-1c") == placeholder_text:
+            search_notes_text.delete("1.0", "end")
+            search_notes_text.config(fg="white")
+
+    def add_placeholder_if_empty(event):
+        if not search_notes_text.get("1.0", "end-1c").strip():
+            search_notes_text.insert("1.0", placeholder_text)
+            search_notes_text.config(fg="gray")
+
+    search_notes_text.bind("<FocusIn>", clear_placeholder)
+    search_notes_text.bind("<FocusOut>", add_placeholder_if_empty)
+    
+    # load notes data
+    try:
+        with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+            notes_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        notes_data = {}
+        
+    # notes list frame
+    notes_frame = Util(view_notes_window).frame()
+    notes_frame.pack(side=LEFT,
+                     anchor=NW,
+                     fill="x",
+                     expand=True,
+                     padx=10,
+                     pady=(0, 5))
+    
+    if not notes_data:
+        # no notes message
+        no_notes_label = Util(notes_frame).label()
+        no_notes_label.config(text="No notes found. Create a new note to get started!",
+                             font=("Arial", 12, "normal"))
+        no_notes_label.pack(pady=50)
+    else:
+        # display each note
+        for note_id, note_data in notes_data.items():
+            # note container frame for the entire note row
+            note_container = Util(notes_frame).frame()
+            note_container.pack(fill="x",
+                                pady=5)
+            
+            # individual note frame
+            note_frame = Util(note_container).frame()
+            note_frame.config(bg="#4D4C4C")
+            note_frame.pack(side=LEFT,
+                            fill="x",
+                            expand=True)
+            
+                # last modified
+            last_modified = note_data.get("last_modified", "")
+            if last_modified:
+                try:
+                    mod_date = datetime.fromisoformat(last_modified)
+                    last_modified = mod_date.strftime("%m/%d/%Y %H:%M")
+                except ValueError:
+                    last_modified = "Unknown"
+            
+                # note title label
+            title = note_data.get("title", "Untitled")
+            note_title_label = Util(note_frame).label()
+            note_title_label.config(text=title,
+                                    font=("Arial", 12, "bold"),
+                                    bg="#4D4C4C")
+            note_title_label.pack(anchor=W)
+
+                # note last modified label
+            note_last_modified_label = Util(note_frame).label()
+            note_last_modified_label.config(text=f"Last Modified: {last_modified}",
+                                            font=("Arial", 12, "normal"),
+                                            bg="#4D4C4C")
+            note_last_modified_label.pack(anchor=W)
+            
+            # separate frame for buttons on the right
+            button_frame = Util(note_container).frame()
+            button_frame.pack(side=RIGHT,
+                              padx=(10, 0))
+            
+                # load and resize image
+            pil_image = PImage.open("./assets/edit_icon.png")
+            pil_image = pil_image.resize((42, 42))  # resize
+            edit_icon = ImageTk.PhotoImage(pil_image)
+                # edit button
+            edit_btn = Util(button_frame).button()
+            edit_btn.config(image=edit_icon,
+                            command=lambda nid=note_id: open_note(nid))
+            edit_btn.image = edit_icon  # keeps reference
+            edit_btn.pack(side=LEFT,
+                          padx=(0, 10))
+            
+                # load and resize image
+            pil_image = PImage.open("./assets/delete_icon.png")
+            pil_image = pil_image.resize((42, 42))  # resize
+            delete_icon = ImageTk.PhotoImage(pil_image)
+                # delete button
+            delete_btn = Util(button_frame).button()
+            delete_btn.config(image=delete_icon,
+                              command=lambda nid=note_id, nt=title: confirm_delete(nid, nt))
+            delete_btn.image = delete_icon  # keeps reference
+            delete_btn.pack(side=LEFT)
+            
+        def confirm_delete(note_id, note_title):
+            """
+            Show confirmation dialog before deleting a note.
+            """
+            response = messagebox.askquestion(
+                "Confirm Delete",
+                f"Are you sure you want to delete\n{note_title}?\n\nThis cannot be undone.",
+                icon='warning',
+            )
+            
+            if response == 'yes':
+                delete_note(note_id)
+
+        def delete_note(note_id):
+            """
+            Actually delete the note from the JSON file and refresh the view.
+            """
+            try:
+                # load current notes data
+                with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+                    notes_data = json.load(f)
+                
+                # remove the note
+                if note_id in notes_data:
+                    del notes_data[note_id]
+                    
+                    # save updated data
+                    with open("notes_data/notes.json", "w", encoding="utf-8") as f:
+                        json.dump(notes_data, f, indent=2, ensure_ascii=False)
+                    
+                    # show success message
+                    messagebox.showinfo("Success", "Note deleted successfully.")
+                    
+                    # refresh the view notes window
+                    refresh_notes_view()
+                else:
+                    messagebox.showerror("Error", "Note not found.")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete note: {str(e)}")
+
+        def refresh_notes_view():
+            """
+            Refresh the view notes window to reflect changes.
+            """
+            # close the current view notes window
+            view_notes_window.destroy()
+            # reopen the view notes window
+            view_notes()
+            
+        def open_note(note_id):
+            """
+            Open an existing note in the editor.
+            """
+            view_notes_window.destroy()  # close the view window
+            new_note(note_id)  # open the note editor with the specific note ID
 
 if __name__ == "__main__":
     main_window = Window()
