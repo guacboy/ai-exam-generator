@@ -350,25 +350,54 @@ def new_note(note_id=None) -> None:
     generate_exam_btn.pack(side=RIGHT,
                            padx=(0, 10))
     
-    # auto-save function using NoteManager
-    def auto_save():
+    def save_note():
+        """
+        Save the note (new or existing).
+        """
         title = title_text.get("1.0", "end-1c").strip() or "Untitled"
         content = note_text.get("1.0", "end-1c")
         
-        if note_manager.save_note(note_id, title, content, placeholder_text):
-            current_time = datetime.now().strftime("%H:%M:%S")
-            note_status_label.config(text=f"Auto-saved at {current_time}")
+        # don't save if it's just placeholder text
+        if content == placeholder_text:
+            return
         
-        new_note_window.after(30000, auto_save)  # every 30 seconds
+        # load current notes data
+        try:
+            with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+                all_notes = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            all_notes = {}
+        
+        # update or create note
+        all_notes[note_id] = {
+            'title': title,
+            'content': content,
+            'last_modified': datetime.now().isoformat(),
+            'created': all_notes.get(note_id, {}).get('created', datetime.now().isoformat())
+        }
+        
+        # save back to file
+        try:
+            with open("notes_data/notes.json", "w", encoding="utf-8") as f:
+                json.dump(all_notes, f, indent=2, ensure_ascii=False)
+            
+            # update status
+            current_time = datetime.now().strftime("%H:%M:%S")
+            note_status_label.config(text=f"Saved at {current_time}")
+            
+        except Exception as e:
+            note_status_label.config(text=f"Save failed: {str(e)}")
     
-    # start auto-save
+    # auto-save
+    def auto_save():
+        save_note()
+        new_note_window.after(30000, auto_save)  # save every 30 seconds
+    
     auto_save()
     
     # save on close
     def on_closing():
-        title = title_text.get("1.0", "end-1c").strip() or "Untitled"
-        content = note_text.get("1.0", "end-1c")
-        note_manager.save_note(note_id, title, content, placeholder_text)
+        save_note()
         new_note_window.destroy()
     
     new_note_window.protocol("WM_DELETE_WINDOW", on_closing)
@@ -511,7 +540,7 @@ def view_notes() -> None:
             """
             response = messagebox.askquestion(
                 "Confirm Delete",
-                f"Are you sure you want to delete\n{note_title}?\n\nThis cannot be undone.",
+                f"Are you sure you want to delete\n'{note_title}'?\n\nThis cannot be undone.",
                 icon='warning',
             )
             
