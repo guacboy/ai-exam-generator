@@ -101,7 +101,7 @@ def new_note(note_id=None) -> None:
     # load notes data
     notes_data = {}
     try:
-        with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+        with open("data/notes.json", "r", encoding="utf-8") as f:
             notes_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         pass
@@ -345,10 +345,122 @@ def new_note(note_id=None) -> None:
                              compound=RIGHT,
                              padx=10,
                              pady=0,
-                             command=lambda: print("generate"))
+                             command=lambda: amount_of_questions())
     generate_exam_btn.image = generate_exam_icon
     generate_exam_btn.pack(side=RIGHT,
                            padx=(0, 10))
+    
+    def amount_of_questions() -> int:
+        """
+        Prompt user for the number of questions to generate.
+        Returns the selected number of questions.
+        """
+        # creates a new window
+        exam_options_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam Options",
+                                                         "500x250")
+        
+        # initialize the number of questions
+        question_count = IntVar(value=10)  # default to 10 questions
+        
+        # title label
+        title_label = Util(exam_options_window).label()
+        title_label.config(text="Amount of Questions to Appear",
+                           font=("Arial", 16, "bold"))
+        title_label.pack(pady=(50, 10))
+        
+        # number input frame
+        number_frame = Util(exam_options_window).frame()
+        number_frame.pack(pady=(0, 20))
+        
+        # left arrow (decrease)
+        left_arrow_label = Util(number_frame).label()
+        left_arrow_label.config(text="<",
+                                font=("Arial", 24, "bold"),
+                                fg="#FFFFFF",
+                                cursor="hand2")
+        left_arrow_label.pack(side=LEFT,
+                              padx=20)
+        
+        # number display
+        number_entry = Entry(number_frame,
+                             textvariable=question_count,
+                             font=("Arial", 20, "bold"),
+                             width=4,
+                             bg="#4D4C4C",
+                             fg="white",
+                             relief="solid",
+                             bd=1,
+                             justify="center")
+        number_entry.pack(side=LEFT)
+        
+        # right arrow (increase)
+        right_arrow_label = Util(number_frame).label()
+        right_arrow_label.config(text=">",
+                                font=("Arial", 24, "bold"),
+                                fg="#FFFFFF",
+                                cursor="hand2")
+        right_arrow_label.pack(side=LEFT,
+                               padx=20)
+        
+        # function to increase number
+        def increase_number(event=None):
+            current = question_count.get()
+            if current < 30:  # maximum 30 questions
+                question_count.set(current + 1)
+        
+        # function to decrease number
+        def decrease_number(event=None):
+            current = question_count.get()
+            if current > 1:  # minimum 1 question
+                question_count.set(current - 1)
+        
+        # validate function for entry
+        def validate_entry(input):
+            if input.isdigit() or input == "":
+                try:
+                    if input == "" or 1 <= int(input) <= 30:
+                        return True
+                except:
+                    pass
+            return False
+        
+        # register validation
+        vcmd = (exam_options_window.register(validate_entry), '%P')
+        number_entry.config(validate="key",
+                            validatecommand=vcmd)
+        
+        # bind arrow clicks
+        left_arrow_label.bind("<Button-1>", decrease_number)
+        right_arrow_label.bind("<Button-1>", increase_number)
+        
+        # add visual feedback for arrows
+        def on_arrow_enter(event):
+            event.widget.config(fg="#9E9E9E")
+        
+        def on_arrow_leave(event):
+            event.widget.config(fg="#FFFFFF")
+        
+        left_arrow_label.bind("<Enter>", on_arrow_enter)
+        left_arrow_label.bind("<Leave>", on_arrow_leave)
+        right_arrow_label.bind("<Enter>", on_arrow_enter)
+        right_arrow_label.bind("<Leave>", on_arrow_leave)
+        
+        # confirm button
+        def on_confirm():
+            selected_count = question_count.get()
+            exam_options_window.destroy()
+            new_exam(selected_count)
+        
+        confirm_btn = Util(exam_options_window).button()
+        confirm_btn.config(text="Confirm",
+                           command=lambda: on_confirm())
+        confirm_btn.pack(pady=20)
+        
+        # set focus to the window and select the number
+        number_entry.focus_set()
+        number_entry.select_range(0, 'end')
+        
+        return question_count.get()
     
     def save_note():
         """
@@ -363,7 +475,7 @@ def new_note(note_id=None) -> None:
         
         # load current notes data
         try:
-            with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+            with open("data/notes.json", "r", encoding="utf-8") as f:
                 all_notes = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             all_notes = {}
@@ -378,7 +490,7 @@ def new_note(note_id=None) -> None:
         
         # save back to file
         try:
-            with open("notes_data/notes.json", "w", encoding="utf-8") as f:
+            with open("data/notes.json", "w", encoding="utf-8") as f:
                 json.dump(all_notes, f, indent=2, ensure_ascii=False)
             
             # update status
@@ -402,7 +514,267 @@ def new_note(note_id=None) -> None:
     
     new_note_window.protocol("WM_DELETE_WINDOW", on_closing)
 
+def new_exam(num_questions=10) -> None:
+    """
+    Creates a new exam.
+    """
+    # creates a new window
+    new_exam_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam")
+    
+    # track current question
+    current_question = IntVar(value=1)
+    
+    # exam information frame
+    exam_info_frame = Util(new_exam_window).frame()
+    exam_info_frame.config(bg="#3A3A3A")
+    exam_info_frame.pack(fill="x", padx=10, pady=10)
+    
+        # question number display
+    question_number_frame = Util(exam_info_frame).frame()
+    question_number_frame.config(bg="#3A3A3A")
+    question_number_frame.pack(side=LEFT)
+    
+        # current question
+    curr_question_label = Util(question_number_frame).label()
+    curr_question_label.config(text=f"Q{current_question.get()}",
+                               font=("Arial", 24, "bold"),
+                               bg="#3A3A3A",
+                               fg="white")
+    curr_question_label.pack(side=LEFT)
+    
+        # total number of questions
+    total_question_label = Util(question_number_frame).label()
+    total_question_label.config(text=f"/ {num_questions}",
+                                font=("Arial", 14, "normal"),
+                                bg="#3A3A3A",
+                                fg="white")
+    total_question_label.pack(side=LEFT,
+                              pady=(8, 0))
+    
+        # end exam button
+    end_exam_btn = Util(exam_info_frame).button()
+    end_exam_btn.config(text="END",
+                        font=("Arial", 12, "bold"),
+                        bg="#ff4444",
+                        fg="white",
+                        command=lambda: confirm_end_exam(new_exam_window))
+    end_exam_btn.pack(side=RIGHT)
+    
+    # main content frame (questions and answers)
+    content_frame = Util(new_exam_window).frame()
+    content_frame.config(bg="#4D4C4C")
+    content_frame.pack(fill="both",
+                       expand=True,
+                       padx=10,
+                       pady=(0, 10))
+    
+        # question frame
+    question_frame = Util(content_frame).frame()
+    question_frame.config(bg="#4D4C4C")
+    question_frame.pack(fill="x", padx=20, pady=20)
+    
+            # question text
+    question_label = Util(question_frame).label()
+    question_label.config(font=("Arial", 14, "normal"),
+                          bg="#4D4C4C",
+                          fg="white",
+                          justify=LEFT,
+                          wraplength=700)
+    question_label.pack(anchor="w")
+    
+            # multiple choice answers frame
+    answers_frame = Util(content_frame).frame()
+    answers_frame.config(bg="#4D4C4C")
+    answers_frame.pack(fill="both",
+                       expand=True,
+                       padx=20,
+                       pady=20)
+    
+    # Sample multiple choice answers
+    choices = ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"]
+    answer_var = StringVar(value="")  # to track selected answer
+    
+    for choice in choices:
+        choice_frame = Util(answers_frame).frame()
+        choice_frame.config(bg="#4D4C4C")
+        choice_frame.pack(fill="x",
+                          pady=5)
+        
+        # radio button for each choice
+        radio_btn = Radiobutton(choice_frame,
+                                text=choice,
+                                variable=answer_var,
+                                value=choice,
+                                font=("Arial", 12, "normal"),
+                                bg="#4D4C4C",
+                                fg="#FFFFFF",
+                                selectcolor="#3A3A3A",
+                                activebackground="#4D4C4C",
+                                activeforeground="white")
+        radio_btn.pack(anchor="w")
+    
+    # navigation frame
+    navigation_frame = Util(new_exam_window).frame()
+    navigation_frame.config(bg=PROGRAM_BG_COLOR)
+    navigation_frame.pack(fill="x",
+                          padx=10,
+                          pady=10)
+    
+        # navigation controls
+    nav_controls_frame = Util(navigation_frame).frame()
+    nav_controls_frame.config(bg=PROGRAM_BG_COLOR)
+    nav_controls_frame.pack()
+    
+            # << label (first question)
+    first_label = Util(nav_controls_frame).label()
+    first_label.config(text="<<",
+                       font=("Arial", 16, "bold"),
+                       bg=PROGRAM_BG_COLOR,
+                       fg="#FFFFFF",
+                       cursor="hand2")
+    first_label.pack(side=LEFT, padx=5)
+    
+            # < label (previous question)
+    prev_label = Util(nav_controls_frame).label()
+    prev_label.config(text="<",
+                      font=("Arial", 16, "bold"),
+                      bg=PROGRAM_BG_COLOR,
+                      fg="#FFFFFF",
+                      cursor="hand2")
+    prev_label.pack(side=LEFT,
+                    padx=5)
+    
+            # question number entry
+    question_entry = Entry(nav_controls_frame,
+                          font=("Arial", 12, "normal"),
+                          bg="#4D4C4C",
+                          fg="#FFFFFF",
+                          width=5,
+                          justify="center")
+    question_entry.insert(0, str(current_question.get()))
+    question_entry.pack(side=LEFT,
+                        padx=10)
+    
+            # > label (next question)
+    next_label = Util(nav_controls_frame).label()
+    next_label.config(text=">",
+                      font=("Arial", 16, "bold"),
+                      bg=PROGRAM_BG_COLOR,
+                      fg="#FFFFFF",
+                      cursor="hand2")
+    next_label.pack(side=LEFT,
+                    padx=5)
+    
+            # >> label (last question)
+    last_label = Util(nav_controls_frame).label()
+    last_label.config(text=">>",
+                      font=("Arial", 16, "bold"),
+                      bg=PROGRAM_BG_COLOR,
+                      fg="#FFFFFF",
+                      cursor="hand2")
+    last_label.pack(side=LEFT,
+                    padx=5)
+    
+    # navigates to a specific question
+    def go_to_question(question_num):
+        if 1 <= question_num <= num_questions:
+            current_question.set(question_num)
+            update_question_display()
+    
+    # updates the question display
+    def update_question_display():
+        # update the current question number
+        curr_question_label.config(text=f"Q{current_question.get()}")
+        
+        # update the entry box
+        question_entry.delete(0, END)
+        question_entry.insert(0, str(current_question.get()))
+        
+        # update question content
+        question_label.config(text="Questions would appear here.")
+        
+        # update label colors based on availability
+        first_label.config(fg="#FFFFFF" if current_question.get() > 1 else "#2A2A2A")
+        prev_label.config(fg="#FFFFFF" if current_question.get() > 1 else "#2A2A2A")
+        next_label.config(fg="#FFFFFF" if current_question.get() < num_questions else "#2A2A2A")
+        last_label.config(fg="#FFFFFF" if current_question.get() < num_questions else "#2A2A2A")
+    
+    # handles entry box changes
+    def on_entry_change(event=None):
+        try:
+            new_num = int(question_entry.get())
+            go_to_question(new_num)
+        except ValueError:
+            # if invalid input, revert to current question
+            question_entry.delete(0, END)
+            question_entry.insert(0, str(current_question.get()))
+    
+    # bind click events to navigation labels
+    def on_first_click(event):
+        if current_question.get() > 1:
+            go_to_question(1)
+    
+    def on_prev_click(event):
+        if current_question.get() > 1:
+            go_to_question(current_question.get() - 1)
+    
+    def on_next_click(event):
+        if current_question.get() < num_questions:
+            go_to_question(current_question.get() + 1)
+    
+    def on_last_click(event):
+        if current_question.get() < num_questions:
+            go_to_question(num_questions)
+    
+    # bind click events
+    first_label.bind("<Button-1>", on_first_click)
+    prev_label.bind("<Button-1>", on_prev_click)
+    next_label.bind("<Button-1>", on_next_click)
+    last_label.bind("<Button-1>", on_last_click)
+    
+    # add hover effects
+    def on_nav_enter(event):
+        if event.widget.cget("fg") != "#2A2A2A":  # only change if not disabled
+            event.widget.config(fg="#9E9E9E")  # on hover
+    
+    def on_nav_leave(event):
+        # return to appropriate color based on availability
+        widget_text = event.widget.cget("text")
+        if widget_text == "<<" or widget_text == "<":
+            event.widget.config(fg="#FFFFFF" if current_question.get() > 1 else "#2A2A2A")
+        else:
+            event.widget.config(fg="#FFFFFF" if current_question.get() < num_questions else "#2A2A2A")
+    
+    # Apply hover effects to all navigation labels
+    for nav_label in [first_label, prev_label, next_label, last_label]:
+        nav_label.bind("<Enter>", on_nav_enter)
+        nav_label.bind("<Leave>", on_nav_leave)
+    
+    question_entry.bind("<Return>", on_entry_change)
+    question_entry.bind("<FocusOut>", on_entry_change)
+    
+    # confirms ending the exam
+    def confirm_end_exam(window):
+        from tkinter import messagebox
+        
+        result = messagebox.askquestion(
+            "End Exam",
+            "Are you sure you want to end the exam?\n\nThis cannot be undone.",
+            icon='warning'
+        )
+        
+        if result == 'yes':
+            # You can add exam submission logic here
+            messagebox.showinfo("Exam Ended", "Your exam has been submitted.")
+            window.destroy()
+    
+    # initialize the display
+    update_question_display()
+
 def view_notes() -> None:
+    """
+    View all current notes.
+    """
     view_notes_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - View Notes")
     
     # search notes frame
@@ -447,7 +819,7 @@ def view_notes() -> None:
     
     # load notes data
     try:
-        with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+        with open("data/notes.json", "r", encoding="utf-8") as f:
             notes_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         notes_data = {}
@@ -553,7 +925,7 @@ def view_notes() -> None:
             """
             try:
                 # load current notes data
-                with open("notes_data/notes.json", "r", encoding="utf-8") as f:
+                with open("data/notes.json", "r", encoding="utf-8") as f:
                     notes_data = json.load(f)
                 
                 # remove the note
@@ -561,7 +933,7 @@ def view_notes() -> None:
                     del notes_data[note_id]
                     
                     # save updated data
-                    with open("notes_data/notes.json", "w", encoding="utf-8") as f:
+                    with open("data/notes.json", "w", encoding="utf-8") as f:
                         json.dump(notes_data, f, indent=2, ensure_ascii=False)
                     
                     # show success message
@@ -590,6 +962,12 @@ def view_notes() -> None:
             """
             view_notes_window.destroy()  # close the view window
             new_note(note_id)  # open the note editor with the specific note ID
+            
+def view_exams() -> None:
+    """
+    View all past exams.
+    """
+    pass
 
 if __name__ == "__main__":
     main_window = Window()
