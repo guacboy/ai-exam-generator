@@ -514,15 +514,39 @@ def new_note(note_id=None) -> None:
     
     new_note_window.protocol("WM_DELETE_WINDOW", on_closing)
 
-def new_exam(num_questions=10) -> None:
+def new_exam(num_questions=10,
+             graded_mode=False,
+             user_answers=None,
+             correct_answers=None) -> None:
     """
     Creates a new exam.
     """
     # creates a new window
-    new_exam_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam")
+    if graded_mode:
+        new_exam_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam Results")
+    else:
+        new_exam_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam")
     
-    # track current question
+    # track current question and user answers
     current_question = IntVar(value=1)
+    
+    # if this is a graded view, use provided answers;
+    # otherwise initialize empty
+    if graded_mode and user_answers is not None:
+        exam_user_answers = user_answers
+        exam_graded = True
+    else:
+        exam_user_answers = {}
+        exam_graded = False
+    
+    # default correct answers (replace this with AI-generated answers)
+    if correct_answers is None:
+        correct_answers = {
+            1: "A) First option",
+            2: "B) Second option", 
+            3: "C) Third option",
+            4: "D) Fourth option",
+        }
     
     # exam information frame
     exam_info_frame = Util(new_exam_window).frame()
@@ -551,14 +575,62 @@ def new_exam(num_questions=10) -> None:
     total_question_label.pack(side=LEFT,
                               pady=(8, 0))
     
-        # end exam button
+    # feedback buttons frame (visible only in graded mode)
+    feedback_frame = Util(exam_info_frame).frame()
+    feedback_frame.config(bg="#3A3A3A")
+    feedback_frame.pack(side=RIGHT)
+    
+        # thumbs down button
+    thumbs_down_icon = None
+    thumbs_down_btn = Util(feedback_frame).button()
+    
+        # thumbs up button  
+    thumbs_up_icon = None
+    thumbs_up_btn = Util(feedback_frame).button()
+    
+        # load feedback icons (only in graded mode)
+    if graded_mode:
+        try:
+            # thumbs down
+            pil_image = PImage.open("./assets/thumbs_down_icon.png")
+            pil_image = pil_image.resize((32, 32))
+            thumbs_down_icon = ImageTk.PhotoImage(pil_image)
+            thumbs_down_btn.config(image=thumbs_down_icon, 
+                                bg="#3A3A3A",
+                                relief="flat",
+                                command=lambda: save_feedback("negative"))
+            thumbs_down_btn.image = thumbs_down_icon
+            
+            # thumbs up
+            pil_image = PImage.open("./assets/thumbs_up_icon.png")
+            pil_image = pil_image.resize((32, 32))
+            thumbs_up_icon = ImageTk.PhotoImage(pil_image)
+            thumbs_up_btn.config(image=thumbs_up_icon,
+                                bg="#3A3A3A", 
+                                relief="flat",
+                                command=lambda: save_feedback("positive"))
+            thumbs_up_btn.image = thumbs_up_icon
+            
+            thumbs_down_btn.pack(side=LEFT, padx=5)
+            thumbs_up_btn.pack(side=LEFT, padx=5)
+            
+            feedback_frame.pack(side=RIGHT)
+            
+        except Exception as e:
+            print(f"Could not load feedback icons: {e}")
+    
+        # end exam button (only in non-graded mode)
     end_exam_btn = Util(exam_info_frame).button()
-    end_exam_btn.config(text="END",
-                        font=("Arial", 12, "bold"),
-                        bg="#ff4444",
-                        fg="white",
-                        command=lambda: confirm_end_exam(new_exam_window))
-    end_exam_btn.pack(side=RIGHT)
+    if not graded_mode:
+        end_exam_btn.config(text="END",
+                            font=("Arial", 12, "bold"),
+                            bg="#ff4444",
+                            fg="white",
+                            command=lambda: confirm_end_exam(new_exam_window, exam_user_answers, correct_answers))
+        end_exam_btn.pack(side=RIGHT)
+    else:
+        # in graded mode, don't show the end exam button
+        end_exam_btn.pack_forget()
     
     # main content frame (questions and answers)
     content_frame = Util(new_exam_window).frame()
@@ -590,9 +662,12 @@ def new_exam(num_questions=10) -> None:
                        padx=20,
                        pady=20)
     
-    # Sample multiple choice answers
+    # sample multiple choice answers
     choices = ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"]
     answer_var = StringVar(value="")  # to track selected answer
+    
+    # store radio buttons for later highlighting
+    radio_buttons = []
     
     for choice in choices:
         choice_frame = Util(answers_frame).frame()
@@ -612,6 +687,16 @@ def new_exam(num_questions=10) -> None:
                                 activebackground="#4D4C4C",
                                 activeforeground="white")
         radio_btn.pack(anchor="w")
+        radio_buttons.append(radio_btn)
+        
+    # save user's answer (only in non-graded mode)
+    def save_answer():
+        if not graded_mode:
+            user_answers[current_question.get()] = answer_var.get()
+    
+    # update radio button when answer changes (only in non-graded mode)
+    if not graded_mode:
+        answer_var.trace('w', lambda *args: save_answer())
     
     # navigation frame
     navigation_frame = Util(new_exam_window).frame()
@@ -693,11 +778,103 @@ def new_exam(num_questions=10) -> None:
         # update question content
         question_label.config(text="Questions would appear here.")
         
+        # load user's answer for this question if exists
+        if current_question.get() in user_answers:
+            answer_var.set(user_answers[current_question.get()])
+        else:
+            answer_var.set("")  # clear if no answer
+        
+        # highlight answers if exam is graded
+        if exam_graded:
+            highlight_answers()
+        
         # update label colors based on availability
         first_label.config(fg="#FFFFFF" if current_question.get() > 1 else "#2A2A2A")
         prev_label.config(fg="#FFFFFF" if current_question.get() > 1 else "#2A2A2A")
         next_label.config(fg="#FFFFFF" if current_question.get() < num_questions else "#2A2A2A")
         last_label.config(fg="#FFFFFF" if current_question.get() < num_questions else "#2A2A2A")
+        
+    # Function to highlight correct/incorrect answers
+    def highlight_answers():
+        current_q = current_question.get()
+        if current_q in correct_answers:
+            correct_answer = correct_answers[current_q]
+            user_answer = user_answers.get(current_q, "")
+            
+            for radio in radio_buttons:
+                choice_text = radio.cget("text")
+                if choice_text == correct_answer:
+                    # Highlight correct answer in green
+                    radio.config(bg="#73FF73", fg="black")
+                elif choice_text == user_answer and user_answer != correct_answer:
+                    # Highlight incorrect user answer in red
+                    radio.config(bg="#FF3030", fg="black")
+                else:
+                    # Reset other options
+                    radio.config(bg="#4D4C4C", fg="#FFFFFF")
+    
+    # grades the exam
+    def grade_exam(user_answers_dict, correct_answers_dict):
+        score = 0
+        for q_num in range(1, num_questions + 1):
+            if q_num in user_answers_dict and q_num in correct_answers_dict:
+                if user_answers_dict[q_num] == correct_answers_dict[q_num]:
+                    score += 1
+        
+        return score
+    
+    # saves exam data
+    def save_exam_data(score, user_answers_dict, correct_answers_dict):
+        # create data directory if it doesn't exist
+        os.makedirs("data", exist_ok=True)
+        
+        exam_data = {
+            "timestamp": datetime.now().isoformat(),
+            "num_questions": num_questions,
+            "score": score,
+            "user_answers": user_answers,
+            "correct_answers": correct_answers
+        }
+        
+        try:
+            # load existing exams if file exists
+            if os.path.exists("data/exam.json"):
+                with open("data/exam.json", "r") as f:
+                    all_exams = json.load(f)
+            else:
+                all_exams = []
+            
+            # add new exam data
+            all_exams.append(exam_data)
+            
+            # save back to file
+            with open("data/exam.json", "w") as f:
+                json.dump(all_exams, f, indent=2)
+            
+            return True
+        except Exception as e:
+            print(f"Error saving exam data: {e}")
+            return False
+    
+    # saves user feedback
+    def save_feedback(feedback_type):
+        # load existing exams
+        try:
+            if os.path.exists("data/exam.json"):
+                with open("data/exam.json", "r") as f:
+                    all_exams = json.load(f)
+                
+                # add feedback to the most recent exam
+                if all_exams:
+                    all_exams[-1]["feedback"] = feedback_type
+                    
+                    # save back
+                    with open("data/exam.json", "w") as f:
+                        json.dump(all_exams, f, indent=2)
+            else:
+                messagebox.showwarning("Error", "No exam data found to add feedback to.")
+        except Exception as e:
+            print(f"Error saving feedback: {e}")
     
     # handles entry box changes
     def on_entry_change(event=None):
@@ -754,19 +931,28 @@ def new_exam(num_questions=10) -> None:
     question_entry.bind("<FocusOut>", on_entry_change)
     
     # confirms ending the exam
-    def confirm_end_exam(window):
-        from tkinter import messagebox
-        
+    def confirm_end_exam(window, user_answers_dict, correct_answers_dict):
         result = messagebox.askquestion(
             "End Exam",
             "Are you sure you want to end the exam?\n\nThis cannot be undone.",
             icon='warning'
         )
         
-        if result == 'yes':
-            # You can add exam submission logic here
-            messagebox.showinfo("Exam Ended", "Your exam has been submitted.")
+        if result == "yes":
+            # grade the exam
+            score = grade_exam(user_answers_dict, correct_answers_dict)
+            
+            # save exam data
+            save_exam_data(score, user_answers_dict, correct_answers_dict)
+            
+            # close the current exam window
             window.destroy()
+            
+            # reopen in graded mode with the same questions and user answers
+            new_exam(num_questions=num_questions, 
+                     graded_mode=True, 
+                     user_answers=user_answers_dict, 
+                     correct_answers=correct_answers_dict)
     
     # initialize the display
     update_question_display()
