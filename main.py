@@ -80,7 +80,7 @@ def menu() -> None:
         # view exams button
     view_exams_btn = Util(view_framework).button()
     view_exams_btn.config(text="View Exams",
-                          command=lambda: print("view exams"))
+                          command=lambda: view_exams())
     view_exams_btn.pack(side=LEFT,
                         padx=(25, 0))
     
@@ -1153,8 +1153,220 @@ def view_exams() -> None:
     """
     View all past exams.
     """
-    pass
+    view_exams_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - View Exams")
+    
+    # search exams frame
+    search_exams_frame = Util(view_exams_window).frame()
+    search_exams_frame.pack(side=TOP,
+                            pady=(0, 5))
+    
+    # load and resize image
+    pil_image = PImage.open("./assets/search_icon.png")
+    pil_image = pil_image.resize((32, 32))  # resize
+    search_icon = ImageTk.PhotoImage(pil_image)
+    # search image
+    search_label = Util(search_exams_frame).label()
+    search_label.config(image=search_icon)
+    search_label.image = search_icon  # keeps reference
+    search_label.pack(side=LEFT)
+    
+    # search exams text
+    search_exams_text = Util(search_exams_frame).text()
+    search_exams_text.config(font=("Arial", 16, "normal"),
+                             bg="#4D4C4C",
+                             height=1)
+    search_exams_text.pack(side=LEFT)
+    
+    # add placeholder
+    placeholder_text = "Search..."
+    search_exams_text.insert("1.0", placeholder_text)
+    search_exams_text.config(fg="gray")
 
+    def clear_placeholder(event):
+        if search_exams_text.get("1.0", "end-1c") == placeholder_text:
+            search_exams_text.delete("1.0", "end")
+            search_exams_text.config(fg="white")
+
+    def add_placeholder_if_empty(event):
+        if not search_exams_text.get("1.0", "end-1c").strip():
+            search_exams_text.insert("1.0", placeholder_text)
+            search_exams_text.config(fg="gray")
+
+    search_exams_text.bind("<FocusIn>", clear_placeholder)
+    search_exams_text.bind("<FocusOut>", add_placeholder_if_empty)
+    
+    # load exams data
+    try:
+        with open("data/exam.json", "r", encoding="utf-8") as f:
+            exams_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        exams_data = []
+        
+    # exams list frame
+    exams_frame = Util(view_exams_window).frame()
+    exams_frame.pack(side=LEFT,
+                     anchor=NW,
+                     fill="x",
+                     expand=True,
+                     padx=10,
+                     pady=(0, 5))
+    
+    if not exams_data:
+        # no exams message
+        no_exams_label = Util(exams_frame).label()
+        no_exams_label.config(text="No exams found. Generate an exam to get started!",
+                             font=("Arial", 12, "normal"))
+        no_exams_label.pack(pady=50)
+    else:
+        # display each exam (reverse to show most recent first)
+        for exam_index, exam_data in enumerate(reversed(exams_data)):
+            # exam container frame for the entire exam row
+            exam_container = Util(exams_frame).frame()
+            exam_container.pack(fill="x",
+                                pady=5)
+            
+            # individual exam frame
+            exam_frame = Util(exam_container).frame()
+            exam_frame.config(bg="#4D4C4C")
+            exam_frame.pack(side=LEFT,
+                            fill="x",
+                            expand=True)
+            
+            # exam date and score
+            timestamp = exam_data.get("timestamp", "")
+            if timestamp:
+                try:
+                    exam_date = datetime.fromisoformat(timestamp)
+                    formatted_date = exam_date.strftime("%m/%d/%Y %H:%M")
+                except ValueError:
+                    formatted_date = "Unknown"
+            else:
+                formatted_date = "Unknown"
+            
+            score = exam_data.get("score", 0)
+            num_questions = exam_data.get("num_questions", 0)
+            percentage = exam_data.get("percentage", 0)
+            
+            # exam title label (date and score)
+            exam_title_label = Util(exam_frame).label()
+            exam_title_label.config(text=f"Exam - {formatted_date}",
+                                    font=("Arial", 12, "bold"),
+                                    bg="#4D4C4C")
+            exam_title_label.pack(anchor=W)
+
+            # exam score label
+            exam_score_label = Util(exam_frame).label()
+            exam_score_label.config(text=f"Score: {score}/{num_questions} ({percentage:.1f}%)",
+                                    font=("Arial", 12, "normal"),
+                                    bg="#4D4C4C")
+            exam_score_label.pack(anchor=W)
+            
+            # separate frame for buttons on the right
+            button_frame = Util(exam_container).frame()
+            button_frame.pack(side=RIGHT,
+                              padx=(10, 0))
+            
+            # load and resize image for edit button
+            pil_image = PImage.open("./assets/edit_icon.png")
+            pil_image = pil_image.resize((42, 42))  # resize
+            edit_icon = ImageTk.PhotoImage(pil_image)
+            # edit button
+            edit_btn = Util(button_frame).button()
+            edit_btn.config(image=edit_icon,
+                              command=lambda idx=len(exams_data)-1-exam_index: open_exam(idx))
+            edit_btn.image = edit_icon  # keeps reference
+            edit_btn.pack(side=LEFT,
+                            padx=(0, 10))
+            
+            # load and resize image for delete button
+            pil_image = PImage.open("./assets/delete_icon.png")
+            pil_image = pil_image.resize((42, 42))  # resize
+            delete_icon = ImageTk.PhotoImage(pil_image)
+            # delete button
+            delete_btn = Util(button_frame).button()
+            delete_btn.config(image=delete_icon,
+                              command=lambda idx=len(exams_data)-1-exam_index, dt=formatted_date: confirm_delete_exam(idx, dt))
+            delete_btn.image = delete_icon  # keeps reference
+            delete_btn.pack(side=LEFT)
+            
+    def confirm_delete_exam(exam_index, exam_date):
+        """
+        Show confirmation dialog before deleting an exam.
+        """
+        response = messagebox.askquestion(
+            "Confirm Delete",
+            f"Are you sure you want to delete\nexam from {exam_date}?\n\nThis cannot be undone.",
+            icon='warning',
+        )
+        
+        if response == 'yes':
+            delete_exam(exam_index)
+
+    def delete_exam(exam_index):
+        """
+        Actually delete the exam from the JSON file and refresh the view.
+        """
+        try:
+            # load current exams data
+            with open("data/exam.json", "r", encoding="utf-8") as f:
+                exams_data = json.load(f)
+            
+            # remove the exam
+            if 0 <= exam_index < len(exams_data):
+                del exams_data[exam_index]
+                
+                # save updated data
+                with open("data/exam.json", "w", encoding="utf-8") as f:
+                    json.dump(exams_data, f, indent=2, ensure_ascii=False)
+                
+                # show success message
+                messagebox.showinfo("Success", "Exam deleted successfully.")
+                
+                # refresh the view exams window
+                refresh_exams_view()
+            else:
+                messagebox.showerror("Error", "Exam not found.")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete exam: {str(e)}")
+
+    def refresh_exams_view():
+        """
+        Refresh the view exams window to reflect changes.
+        """
+        # close the current view exams window
+        view_exams_window.destroy()
+        # reopen the view exams window
+        view_exams()
+        
+    def open_exam(exam_index):
+        """
+        Open an existing exam in review mode.
+        """
+        try:
+            # load exams data
+            with open("data/exam.json", "r", encoding="utf-8") as f:
+                exams_data = json.load(f)
+            
+            if 0 <= exam_index < len(exams_data):
+                exam_data = exams_data[exam_index]
+                
+                # close the view exams window
+                view_exams_window.destroy()
+                
+                # open the exam in graded mode
+                new_exam(
+                    num_questions=exam_data.get("num_questions", 10),
+                    graded_mode=True,
+                    user_answers=exam_data.get("user_answers", {}),
+                    correct_answers=exam_data.get("correct_answers", {})
+                )
+            else:
+                messagebox.showerror("Error", "Exam not found.")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open exam: {str(e)}")
+            
 if __name__ == "__main__":
     main_window = Window()
     menu()
