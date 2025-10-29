@@ -76,6 +76,8 @@ def menu() -> None:
     view_notes_btn.config(text="View Notes",
                           command=lambda: view_notes())
     view_notes_btn.pack(side=LEFT)
+        # tooltip
+    view_notes_tooltip = ToolTip(view_notes_btn, "View previous notes.")
     
         # view exams button
     view_exams_btn = Util(view_framework).button()
@@ -83,6 +85,8 @@ def menu() -> None:
                           command=lambda: view_exams())
     view_exams_btn.pack(side=LEFT,
                         padx=(25, 0))
+        # tooltip
+    view_exams_tooltip = ToolTip(view_exams_btn, "View previous exams.")
     
     # new note button
     new_note_btn = Util(main_window.get_window()).button()
@@ -90,6 +94,8 @@ def menu() -> None:
                         command=lambda: new_note())
     new_note_btn.pack(side=BOTTOM,
                       pady=(0, 25))
+        # tooltip
+    new_note_tooltip = ToolTip(new_note_btn, "Create a new note.")
 
 def new_note(note_id=None) -> None:
     """
@@ -613,6 +619,10 @@ def new_exam(num_questions=10,
             
             thumbs_down_btn.pack(side=LEFT, padx=5)
             thumbs_up_btn.pack(side=LEFT, padx=5)
+            
+            # tooltips
+            thumbs_up_tooltip = ToolTip(thumbs_up_btn, "See more questions\nlike this.")
+            thumbs_down_tooltip = ToolTip(thumbs_down_btn, "See less questions\nlike this.")
             
             feedback_frame.pack(side=RIGHT)
             
@@ -1366,6 +1376,54 @@ def view_exams() -> None:
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open exam: {str(e)}")
+            
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.id = None
+        widget.bind("<Enter>", self.schedule_tooltip)
+        widget.bind("<Leave>", self.hide_tooltip)
+        widget.bind("<ButtonPress>", self.hide_tooltip)
+    
+    def schedule_tooltip(self, event=None):
+        self.id = self.widget.after(500, self.show_tooltip)  # Show after 500ms delay
+    
+    def show_tooltip(self):
+        x = self.widget.winfo_rootx() + self.widget.winfo_width() + 5
+        y = self.widget.winfo_rooty() + (self.widget.winfo_height() // 2)
+        
+        self.tooltip = Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        label = Label(self.tooltip, 
+                     text=self.text, 
+                     justify=LEFT,
+                     background="#1E1E1E",
+                     foreground="#FFFFFF",
+                     relief="flat", 
+                     borderwidth=0,
+                     font=("Arial", 9, "normal"),
+                     padx=8, 
+                     pady=4)
+        label.pack()
+        
+        # add a small arrow pointer
+        arrow = Frame(self.tooltip, 
+                     background="#FFFFFF", 
+                     width=8, 
+                     height=8)
+        arrow.place(x=-4, y=10)  # position arrow to the left
+    
+    def hide_tooltip(self, event=None):
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
             
 if __name__ == "__main__":
     main_window = Window()
