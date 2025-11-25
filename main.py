@@ -5,6 +5,9 @@ import PIL.Image as PImage
 import json
 import os
 from datetime import datetime
+import subprocess
+import threading
+import os
 
 from util import *
 from note import NoteManager
@@ -65,6 +68,19 @@ def menu() -> None:
     description_label.config(text="Turn notes into practice.",
                              font=("Arial", 24, "normal"))
     description_label.pack(pady=(25, 0))
+    
+    # feedback button framework
+    feedback_framework = Util(main_window.get_window()).frame()
+    feedback_framework.pack(side=BOTTOM, pady=(0, 50))
+    
+        # feedback button
+    feedback_btn = Util(feedback_framework).button()
+    feedback_btn.config(text="Submit Feedback",
+                       command=lambda: submit_feedback(),
+                       font=("Arial", 14, "normal"))
+    feedback_btn.pack()
+        # tooltip
+    feedback_tooltip = ToolTip(feedback_btn, "Share your feedback to help improve ExamAI.")
     
     # view button framework
     view_framework = Util(main_window.get_window()).frame()
@@ -1376,6 +1392,161 @@ def view_exams() -> None:
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open exam: {str(e)}")
+            
+def submit_feedback() -> None:
+    """
+    Window to submit feedback about the application.
+    """
+    feedback_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Submit Feedback", "600x500")
+    
+    # title
+    title_label = Util(feedback_window).label()
+    title_label.config(text="We'd Love Your Feedback!",
+                       font=("Arial", 20, "bold"))
+    title_label.pack(pady=(20, 10))
+    
+    # description
+    desc_label = Util(feedback_window).label()
+    desc_label.config(text="Your feedback helps us improve ExamAI.",
+                      font=("Arial", 12, "normal"))
+    desc_label.pack(pady=(0, 20))
+    
+    # feedback text area with scrollbar
+    text_frame = Util(feedback_window).frame()
+    text_frame.pack(fill=BOTH, expand=True, padx=20, pady=(0, 20))
+    
+    feedback_text = Text(text_frame,
+                        bg="#1E1E1E",
+                        fg="white",
+                        font=("Arial", 12, "normal"),
+                        wrap=WORD,
+                        height=15)
+    
+    scrollbar = Scrollbar(text_frame, orient=VERTICAL, command=feedback_text.yview)
+    feedback_text.configure(yscrollcommand=scrollbar.set)
+    
+    feedback_text.pack(side=LEFT, fill=BOTH, expand=True)
+    scrollbar.pack(side=RIGHT, fill=Y)
+    
+    # add placeholder
+    placeholder_text = "Please share your thoughts, suggestions, or report any issues you've encountered..."
+    feedback_text.insert("1.0", placeholder_text)
+    feedback_text.config(fg="gray")
+
+    def clear_placeholder(event):
+        if feedback_text.get("1.0", "end-1c") == placeholder_text:
+            feedback_text.delete("1.0", "end")
+            feedback_text.config(fg="white")
+
+    def add_placeholder_if_empty(event):
+        if not feedback_text.get("1.0", "end-1c").strip():
+            feedback_text.insert("1.0", placeholder_text)
+            feedback_text.config(fg="gray")
+
+    feedback_text.bind("<FocusIn>", clear_placeholder)
+    feedback_text.bind("<FocusOut>", add_placeholder_if_empty)
+    
+    # status label
+    status_label = Util(feedback_window).label()
+    status_label.config(text="", font=("Arial", 10, "normal"))
+    status_label.pack(pady=(0, 10))
+    
+    # button frame
+    button_frame = Util(feedback_window).frame()
+    button_frame.pack(side=BOTTOM, pady=(0, 20))
+    
+    def submit_feedback_action():
+        """Submit feedback by writing to the JSON file in microservice folder."""
+        feedback_content = feedback_text.get("1.0", "end-1c").strip()
+        
+        if not feedback_content or feedback_content == placeholder_text:
+            status_label.config(text="Please enter some feedback before submitting.", fg="red")
+            return
+            
+        # disable submit button during submission
+        submit_btn.config(state=DISABLED)
+        cancel_btn.config(state=DISABLED)
+        status_label.config(text="Submitting your feedback...", fg="white")
+        
+        try:
+            # write feedback to json file
+            success = write_feedback_to_json(feedback_content)
+            
+            if success:
+                status_label.config(text="✓ Thank you for your feedback! It has been submitted.", fg="green")
+                # show success for 3 seconds then close
+                feedback_window.after(3000, feedback_window.destroy)
+            else:
+                status_label.config(text="✗ Failed to submit feedback. Please try again.", fg="red")
+                # re-enable buttons on error
+                submit_btn.config(state=NORMAL)
+                cancel_btn.config(state=NORMAL)
+                
+        except Exception as e:
+            status_label.config(text=f"✗ Error: {str(e)}", fg="red")
+            submit_btn.config(state=NORMAL)
+            cancel_btn.config(state=NORMAL)
+    
+    def write_feedback_to_json(feedback_content):
+        """Write feedback to a JSON file in the microservice folder."""
+        try:
+            # microservice is in a subfolder
+            microservice_folder = "feedback-analyzer-microservice"
+            
+            # create the folder if it doesn't exist
+            os.makedirs(microservice_folder, exist_ok=True)
+            
+            # json file path
+            json_filepath = os.path.join(microservice_folder, "feedbacks.json")
+            
+            # prepare feedback data
+            feedback_data = {
+                'timestamp': datetime.now().isoformat(),
+                'feedback': feedback_content,
+                'status': 'pending'  # mark as pending analysis
+            }
+            
+            # read existing feedbacks or create new list
+            if os.path.exists(json_filepath):
+                try:
+                    with open(json_filepath, 'r', encoding='utf-8') as f:
+                        all_feedbacks = json.load(f)
+                except:
+                    all_feedbacks = []
+            else:
+                all_feedbacks = []
+            
+            # add new feedback
+            all_feedbacks.append(feedback_data)
+            
+            # write back to file
+            with open(json_filepath, 'w', encoding='utf-8') as f:
+                json.dump(all_feedbacks, f, indent=2, ensure_ascii=False)
+            
+            print(f"feedback added to: {json_filepath}")
+            return True
+            
+        except Exception as e:
+            print(f"error writing feedback json: {e}")
+            return False
+    
+    # submit button
+    submit_btn = Util(button_frame).button()
+    submit_btn.config(text="✓ Submit Feedback",
+                      font=("Arial", 14, "bold"),
+                      bg="#4CAF50",
+                      fg="white",
+                      padx=20,
+                      pady=10,
+                      command=submit_feedback_action)
+    submit_btn.pack(side=LEFT, padx=(0, 10))
+    
+    # cancel button
+    cancel_btn = Util(button_frame).button()
+    cancel_btn.config(text="Cancel",
+                      font=("Arial", 14, "normal"),
+                      command=feedback_window.destroy)
+    cancel_btn.pack(side=LEFT)
             
 class ToolTip:
     def __init__(self, widget, text):
