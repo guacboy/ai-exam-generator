@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "suggestion": "this is a suggestion",
+    "date_added": "2025-11-12T15:01:43.971332",
+    "status": "new",
+    "has_attachment": false,
+    "attachment_path": null,
+    "submission_timestamp": "2025-11-12T15:01:43.834863"
+  },
+  {
+    "id": 2,
+    "suggestion": "this is a suggestion",
+    "date_added": "2025-11-12T15:04:02.737454",
+    "status": "new",
+    "has_attachment": false,
+    "attachment_path": null,
+    "submission_timestamp": "2025-11-12T15:01:43.834863"
+  }
+]

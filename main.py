@@ -30,26 +30,26 @@ class IDGeneratorMicroservice:
         self.running = False
     
     def start(self):
-        """Start the microservice in a separate thread"""
+        """start the microservice in a separate thread"""
         self.running = True
         self.thread = threading.Thread(target=self._run_microservice, daemon=True)
         self.thread.start()
         print("ID Generator Microservice started")
     
     def stop(self):
-        """Stop the microservice"""
+        """stop the microservice"""
         self.running = False
         if self.observer:
             self.observer.stop()
             self.observer.join()
     
     def _run_microservice(self):
-        """Run the microservice (adapted from the provided code)"""
+        """run the microservice (adapted from the provided code)"""
         REQUEST_PATH = os.path.abspath("request.txt")
         REQUEST_DIR = os.path.dirname(REQUEST_PATH)
 
         def generate_id():
-            """Generates a unique identifier and stores it in the text file."""
+            """generates a unique identifier and stores it in the text file"""
             unique_id = str(uuid.uuid4().hex[:8])
             print("Generated ID:", unique_id)
 
@@ -57,7 +57,7 @@ class IDGeneratorMicroservice:
                 request_file.write(unique_id)
 
         class Handler(FileSystemEventHandler):
-            """Monitors changes to the directory where the text file is located."""
+            """monitors changes to the directory where the text file is located"""
             def on_modified(self, event):
                 if os.path.abspath(event.src_path) == REQUEST_PATH:
                     with open(REQUEST_PATH, "r") as request_file:
@@ -79,12 +79,12 @@ class IDGeneratorMicroservice:
             self.observer.stop()
             self.observer.join()
 
-# Add this global instance after the class
+# add this global instance after the class
 id_generator = IDGeneratorMicroservice()
 
 def generate_unique_id():
     """
-    Generate a unique ID using the microservice
+    generate a unique ID using the microservice
     """
     # write the request to generate ID
     with open('request.txt', 'w') as f:
@@ -118,7 +118,7 @@ class Window:
     
     def _configure_main_window(self):
         """
-        Configures the window settings.
+        configure the window settings
         """
         self._window.title(PROGRAM_TITLE)
         self._window.geometry(DEFAULT_GEOMETRY)
@@ -127,7 +127,7 @@ class Window:
     
     def create_toplevel(self, title=PROGRAM_TITLE, geometry=DEFAULT_GEOMETRY):
         """
-        Create a new Toplevel window.
+        create a new Toplevel window
         """
         new_window = Toplevel(self._window)
         new_window.title(title)
@@ -143,9 +143,127 @@ class Window:
     def run(self):
         self._window.mainloop()
 
+class SuggestionWindow:
+    def __init__(self, parent):
+        self.parent = parent
+        self.window = Toplevel(parent)
+        self.window.title("Suggestion Box")
+        self.window.geometry("500x400")
+        self.window.resizable(False, False)
+        self.window.config(bg=PROGRAM_BG_COLOR)
+        
+        # initialize suggestions array
+        self.suggestions = []
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """setup the user interface"""
+        # main frame
+        main_frame = Util(self.window).frame()
+        main_frame.pack(fill=BOTH, expand=True, padx=20, pady=20)
+        
+        # title
+        title_label = Util(main_frame).label()
+        title_label.config(text="Submit Your Suggestion", 
+                          font=("Arial", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # suggestion entry
+        entry_label = Util(main_frame).label()
+        entry_label.config(text="Enter your suggestion:", 
+                          font=("Arial", 12))
+        entry_label.pack(anchor="w", pady=(20, 5))
+        
+        self.entry_box = Text(main_frame, height=8, width=50, 
+                             font=("Arial", 10), bg="#1E1E1E", fg="white")
+        self.entry_box.pack(fill=BOTH, expand=True, pady=5)
+        
+        # attached file info
+        self.file_label = Util(main_frame).label()
+        self.file_label.config(text="No file attached", 
+                              fg="gray", font=("Arial", 9))
+        self.file_label.pack(anchor="w", pady=(5, 0))
+        
+        # button frame
+        button_frame = Util(main_frame).frame()
+        button_frame.pack(fill=X, pady=20)
+        
+        # attach file button
+        self.attach_btn = Util(button_frame).button()
+        self.attach_btn.config(text="Attach File", 
+                               command=self.attach_file,
+                               font=("Arial", 10))
+        self.attach_btn.pack(side=LEFT, padx=(0, 10))
+        
+        # submit button
+        self.submit_btn = Util(button_frame).button()
+        self.submit_btn.config(text="Submit Suggestion", 
+                               command=self.submit_suggestion,
+                               font=("Arial", 10, "bold"),
+                               bg="#4CAF50", fg="white")
+        self.submit_btn.pack(side=RIGHT)
+        
+        # initialize attached file
+        self.attached_file = None
+        
+    def attach_file(self):
+        """open file picker to attach an image or document"""
+        file_types = [
+            ("All supported files", "*.jpg *.jpeg *.png *.pdf *.doc *.docx *.txt"),
+            ("Images", "*.jpg *.jpeg *.png"),
+            ("Documents", "*.pdf *.doc *.docx *.txt"),
+            ("All files", "*.*")
+        ]
+        
+        filename = filedialog.askopenfilename(
+            title="Select a file to attach",
+            filetypes=file_types
+        )
+        
+        if filename:
+            self.attached_file = filename
+            file_name = os.path.basename(filename)
+            self.file_label.config(text=f"Attached: {file_name}", fg="green")
+    
+    def submit_suggestion(self):
+        """submit the suggestion to the file"""
+        suggestion_text = self.entry_box.get("1.0", END).strip()
+        
+        if not suggestion_text:
+            messagebox.showwarning("Warning", "Please enter a suggestion before submitting.")
+            return
+        
+        try:
+            # create suggestion object
+            suggestion_data = {
+                "suggestion": suggestion_text,
+                "timestamp": datetime.now().isoformat(),
+                "has_attachment": self.attached_file is not None,
+                "attachment_path": self.attached_file if self.attached_file else None
+            }
+            
+            # add to suggestions array
+            self.suggestions.append(suggestion_data)
+            
+            # write to suggestion.txt
+            with open("suggestion.txt", "a", encoding="utf-8") as f:
+                f.write(json.dumps(suggestion_data) + "\n")
+            
+            # show success message
+            messagebox.showinfo("Success", "Your suggestion has been received and will be reviewed.")
+            
+            # clear the form
+            self.entry_box.delete("1.0", END)
+            self.file_label.config(text="No file attached", fg="gray")
+            self.attached_file = None
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to submit suggestion: {str(e)}")
+
 def menu() -> None:
     """
-    Main (menu) window of program.
+    main (menu) window of program
     """
     # check if streak tracker service is running
     service_running = is_service_running()
@@ -184,18 +302,27 @@ def menu() -> None:
                            fg="#4CAF50")  # green color for streak
         streak_label.pack(pady=(15, 0))
     
-    # feedback button framework
+    # feedback and suggestion button framework
     feedback_framework = Util(main_window.get_window()).frame()
     feedback_framework.pack(side=BOTTOM, pady=(0, 50))
     
-        # feedback button
+    # feedback button
     feedback_btn = Util(feedback_framework).button()
     feedback_btn.config(text="Submit Feedback",
                        command=lambda: submit_feedback(),
                        font=("Arial", 14, "normal"))
-    feedback_btn.pack()
-        # tooltip
+    feedback_btn.pack(side=LEFT)
+    # tooltip
     feedback_tooltip = ToolTip(feedback_btn, "Share your feedback to help improve ExamAI.")
+    
+    # suggestion button (added to the right of feedback button)
+    suggestion_btn = Util(feedback_framework).button()
+    suggestion_btn.config(text="Make a Suggestion",
+                         command=lambda: SuggestionWindow(main_window.get_window()),
+                         font=("Arial", 14, "normal"))
+    suggestion_btn.pack(side=LEFT, padx=(10, 0))
+    # tooltip
+    suggestion_tooltip = ToolTip(suggestion_btn, "Submit suggestions for new features or improvements.")
     
     # view button framework
     view_framework = Util(main_window.get_window()).frame()
@@ -230,7 +357,7 @@ def menu() -> None:
 
 def new_note(note_id=None) -> None:
     """
-    Window to input new notes.
+    window to input new notes
     """
     # creates a new window
     new_note_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - New Note")
@@ -282,7 +409,7 @@ def new_note(note_id=None) -> None:
                      height=40)
     note_text.pack()
     
-    if note_content.strip():  # If there's existing content
+    if note_content.strip():  # if there's existing content
         note_text.insert(INSERT, note_content)
         note_text.config(fg="white")
     else:
@@ -325,7 +452,7 @@ def new_note(note_id=None) -> None:
     
     def upload_file_window() -> None:
         """
-        Uploads files into the text area.
+        uploads files into the text area
         """
         # creates a new window
         upload_file_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Upload Note",
@@ -487,8 +614,8 @@ def new_note(note_id=None) -> None:
     
     def amount_of_questions() -> int:
         """
-        Prompt user for the number of questions to generate.
-        Returns the selected number of questions.
+        prompt user for the number of questions to generate
+        returns the selected number of questions
         """
         # creates a new window
         exam_options_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam Options",
@@ -599,7 +726,7 @@ def new_note(note_id=None) -> None:
     
     def save_note():
         """
-        Save the note (new or existing).
+        save the note (new or existing)
         """
         title = title_text.get("1.0", "end-1c").strip() or "Untitled"
         content = note_text.get("1.0", "end-1c")
