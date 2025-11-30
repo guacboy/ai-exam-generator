@@ -8,6 +8,11 @@ from datetime import datetime
 import subprocess
 import threading
 import os
+import threading
+import time
+import uuid
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 from util import *
 from note import NoteManager
@@ -17,6 +22,90 @@ PROGRAM_TITLE = "ExamAI"
 DEFAULT_GEOMETRY = "750x850"
 
 note_manager = NoteManager()
+
+class IDGeneratorMicroservice:
+    def __init__(self):
+        self.observer = None
+        self.thread = None
+        self.running = False
+    
+    def start(self):
+        """Start the microservice in a separate thread"""
+        self.running = True
+        self.thread = threading.Thread(target=self._run_microservice, daemon=True)
+        self.thread.start()
+        print("ID Generator Microservice started")
+    
+    def stop(self):
+        """Stop the microservice"""
+        self.running = False
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+    
+    def _run_microservice(self):
+        """Run the microservice (adapted from the provided code)"""
+        REQUEST_PATH = os.path.abspath("request.txt")
+        REQUEST_DIR = os.path.dirname(REQUEST_PATH)
+
+        def generate_id():
+            """Generates a unique identifier and stores it in the text file."""
+            unique_id = str(uuid.uuid4().hex[:8])
+            print("Generated ID:", unique_id)
+
+            with open(REQUEST_PATH, "w") as request_file:
+                request_file.write(unique_id)
+
+        class Handler(FileSystemEventHandler):
+            """Monitors changes to the directory where the text file is located."""
+            def on_modified(self, event):
+                if os.path.abspath(event.src_path) == REQUEST_PATH:
+                    with open(REQUEST_PATH, "r") as request_file:
+                        request = request_file.read().strip()
+                    if request == "generate ID":
+                        print(f"{REQUEST_PATH} has been modified - generating ID")
+                        generate_id()
+
+        self.observer = Observer()
+        self.observer.schedule(Handler(), path=REQUEST_DIR, recursive=False)
+        self.observer.start()
+
+        try:
+            while self.running:
+                time.sleep(0.25)
+        except KeyboardInterrupt:
+            self.observer.stop()
+        finally:
+            self.observer.stop()
+            self.observer.join()
+
+# Add this global instance after the class
+id_generator = IDGeneratorMicroservice()
+
+def generate_unique_id():
+    """
+    Generate a unique ID using the microservice
+    """
+    # write the request to generate ID
+    with open('request.txt', 'w') as f:
+        f.write("generate ID")
+    
+    # wait for and read the response
+    max_attempts = 10
+    for _ in range(max_attempts):
+        time.sleep(0.1)  # small delay to allow microservice to respond
+        try:
+            with open('request.txt', 'r') as f:
+                response = f.read().strip()
+            
+            # check if we got a valid ID (8 character hex string)
+            if response and len(response) == 8 and all(c in '0123456789abcdef' for c in response):
+                return f"id_{response}"
+        except:
+            pass
+    
+    # fallback: generate a timestamp-based ID if microservice fails
+    return f"id_fallback_{int(time.time())}"
 
 class Window:
     def __init__(self, is_main=True):
@@ -158,14 +247,12 @@ def new_note(note_id=None) -> None:
     title_content = "Untitled"
     note_content = ""
     
-    # if note_id is provided and exists, load the data
     if note_id and note_id in notes_data:
-        note_data = notes_data[note_id]
-        title_content = note_data.get("title", "Untitled")
-        note_content = note_data.get("content", "")
+    # existing note, keep the same ID
+        pass
     else:
-        # generate unique ID for new note session
-        note_id = f"note_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # generate unique ID for new note session using microservice
+        note_id = note_manager.generate_note_id()
     
     # note information frame
     note_frame = Util(new_note_window).frame()
@@ -565,10 +652,15 @@ def new_note(note_id=None) -> None:
 def new_exam(num_questions=10,
              graded_mode=False,
              user_answers=None,
-             correct_answers=None) -> None:
+             correct_answers=None,
+             exam_id=None) -> None:
     """
     Creates a new exam.
     """
+    # generate exam ID if not provided
+    if not exam_id:
+        exam_id = generate_unique_id()
+    
     # creates a new window
     if graded_mode:
         new_exam_window = main_window.create_toplevel(f"{PROGRAM_TITLE} - Exam Results")
@@ -881,6 +973,7 @@ def new_exam(num_questions=10,
         os.makedirs("data", exist_ok=True)
         
         exam_data = {
+            "exam_id": exam_id,
             "timestamp": datetime.now().isoformat(),
             "num_questions": num_questions,
             "score": score,
@@ -983,7 +1076,10 @@ def new_exam(num_questions=10,
     question_entry.bind("<FocusOut>", on_entry_change)
     
     # confirms ending the exam
-    def confirm_end_exam(window, user_answers_dict, correct_answers_dict):
+    def confirm_end_exam(window,
+                         user_answers_dict,
+                         correct_answers_dict,
+                         exam_id):
         result = messagebox.askquestion(
             "End Exam",
             "Are you sure you want to end the exam?\n\nThis cannot be undone.",
@@ -995,7 +1091,7 @@ def new_exam(num_questions=10,
             score = grade_exam(user_answers_dict, correct_answers_dict)
             
             # save exam data
-            save_exam_data(score, user_answers_dict, correct_answers_dict)
+            save_exam_data(score, user_answers_dict, correct_answers_dict, exam_id)
             
             # close the current exam window
             window.destroy()
@@ -1623,6 +1719,12 @@ class ToolTip:
             self.tooltip = None
             
 if __name__ == "__main__":
+    # start the ID generator microservice
+    id_generator.start()
+    
     main_window = Window()
     menu()
     main_window.run()
+    
+    # stop the microservice when the application closes
+    id_generator.stop()

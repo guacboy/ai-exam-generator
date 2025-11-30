@@ -22,6 +22,14 @@ class NoteManager:
                 return {}
         return {}
     
+    def generate_note_id(self):
+        """
+        Generate a unique note ID using the microservice
+        """
+        # import the function from main to avoid circular imports
+        from main import generate_unique_id
+        return generate_unique_id()
+    
     def save_note(self, note_id, title, content, placeholder_text):
         """
         Save a note to JSON file
