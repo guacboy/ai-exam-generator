@@ -11,6 +11,7 @@ import os
 
 from util import *
 from note import NoteManager
+from streak_tracker_microservice.client import update_streak, get_streak_message, is_service_running
 
 PROGRAM_TITLE = "ExamAI"
 DEFAULT_GEOMETRY = "750x850"
@@ -57,6 +58,23 @@ def menu() -> None:
     """
     Main (menu) window of program.
     """
+    # check if streak tracker service is running
+    service_running = is_service_running()
+    
+    if not service_running:
+        # show warning that service is not running
+        service_label = Util(main_window.get_window()).label()
+        service_label.config(text="Streak tracker service is not running",
+                           font=("Arial", 10, "normal"),
+                           fg="#FF6B6B")  # red color for warning
+        service_label.pack(pady=(10, 0))
+    
+    # update streak by communicating with the background service
+    update_streak()
+    
+    # get streak message from the service
+    streak_message = get_streak_message()
+    
     # title
     title_label = Util(main_window.get_window()).label()
     title_label.config(text=PROGRAM_TITLE,
@@ -68,6 +86,14 @@ def menu() -> None:
     description_label.config(text="Turn notes into practice.",
                              font=("Arial", 24, "normal"))
     description_label.pack(pady=(25, 0))
+    
+    # streak display - only show if streak is > 0
+    if streak_message:
+        streak_label = Util(main_window.get_window()).label()
+        streak_label.config(text=streak_message,
+                           font=("Arial", 16, "normal"),
+                           fg="#4CAF50")  # green color for streak
+        streak_label.pack(pady=(15, 0))
     
     # feedback button framework
     feedback_framework = Util(main_window.get_window()).frame()
