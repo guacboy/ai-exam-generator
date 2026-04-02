@@ -13,7 +13,7 @@ A Python based desktop application that helps students study by generating exam 
 
 ## Tech Stack
 
-- Python 3
+- Python3
 - tkinter for graphical user interface
 - OpenAI API
 - Custom microservices architecture for feedback, streaks, and suggestions
