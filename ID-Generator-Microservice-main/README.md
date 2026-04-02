@@ -1,4 +1,3 @@
-# Group 15 Microservices
 ## ID Generator Microservice
 
 ### Installation
